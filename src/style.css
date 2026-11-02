@@ -1,0 +1,53 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #120e12;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#game {
+  position: fixed;
+  inset: 0;
+  background: #120e12;
+}
+#game canvas {
+  position: absolute;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+#rotate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: #120e12;
+  color: #e6dfc8;
+  font-family: 'Pixelify Sans', monospace;
+  font-size: 20px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  text-align: center;
+}
+body.portrait #rotate { display: flex; }
+body.portrait #game { visibility: hidden; }
+#rotate-icon {
+  width: 72px;
+  height: 120px;
+  image-rendering: pixelated;
+  animation: turn 2.4s steps(1) infinite;
+}
+#rotate p { margin: 0; }
+#rotate small { color: #7d8a96; font-size: 14px; }
+@keyframes turn {
+  0%, 40% { transform: rotate(0deg); }
+  50% { transform: rotate(-45deg); }
+  60%, 100% { transform: rotate(-90deg); }
+}
