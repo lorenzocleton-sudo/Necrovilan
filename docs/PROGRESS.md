@@ -1,52 +1,52 @@
 # Progress
 
-## Version: 0.2 — Style kit + Art Gallery + Test Village (2026-11-02)
+## Version: 0.2.1 — Style deepening (2026-11-02)
 
 **PLAY LINK (artifact, update this same one every session):**
 https://claude.ai/artifact/LyXXV5pthgdUzJStqMXSBX
 
 **BACKUP LINK:**
 https://raw.githack.com/lorenzocleton-sudo/Necrovilan/main/play/index.html
+(main and branch `ccr-e912be30-f76qvv` both carry 0.2.1)
 
 ## What works
-- Title: necromancer on a cobble/mud strip, three parchment/iron buttons
-  (Begin, Gallery, Test Village), tap areas >= 44 CSS px. Keys: Enter, G, V.
-- One sprite format (`SpriteDef`) for all art; validator runs over every
-  sprite in Vitest; seeded recolour helper (peasant: hair, tunic, cap,
-  trousers).
-- 16 code-authored sprites: cobblestone A/B, grass A/B, mud A/B, stone wall,
-  wall with door, terracotta roof (24x24); necromancer, peasant, town guard,
-  skeleton (24x32, outlined, 3-frame idle, shadow); grave (24x32), cart
-  (48x32), market stall (48x48).
-- Art Gallery: Tiles / Characters / Props / Palette tabs, x4 animated,
-  pages with arrows or swipe; tap a sprite for the detail view (x6 or
-  largest fit, palette letters used, 24px grid + anchor toggle, Recolour
-  button for the peasant); Palette page with 24 swatches + hex.
-- Test Village (10x6, 1x, centred, vignette): tap a tile -> A* path shown as
-  soul-green dots, necromancer walks tile by tile with a footstep tick;
-  blocked tile -> red flash + thud. Long-press = name of the tile/thing.
-  Arrows/WASD step. Y-sort: walk behind the cart from above, in front from
-  below. Peasant, guard, skeleton idle (no AI).
-- Single-file build ~1.48 MB, zero runtime network requests.
-- Tests: 60 Vitest tests (16 sprite validator cases + validator negatives,
-  A*: straight, around a wall, unreachable, blocked/off-map, deterministic;
-  recolour, layout, test patch reachability, scale, palette, rng).
-- Smoke test (`npm run smoke`): Title -> Gallery -> all tabs -> detail ->
-  back -> Test Village -> walk + blocked tap; dpr-3 sizing; portrait.
-  Screenshots in docs/screens/0.2-*.png.
+- Rendering: canvas at the real device-pixel size, world zoomed by a whole
+  number (crisp pixels), all text rasterised at screen resolution, >= 16 CSS
+  px, Pixelify Sans; letterbox #0a080b. Tested 1920x1200, 2400x1080, 844x390.
+- Palette 32 (8 new colours, 4-5 step ramps per material). No dithering
+  anywhere; the validator fails any checkerboard run > 3.
+- Redrawn: grass (tufts), mud (darker; puddles, pebbles, ruts), roof
+  (overlapping rows), wall, door; new house (3x3 prop: ridge, chimney,
+  overhang + shadow band, door, window, sign) and well; necromancer (hood
+  rim light, shadowed face, glowing eyes, 4-shade robe, bone staff with
+  soul-green tip); grave/cart/stall re-ramped; peasant/guard/skeleton on the
+  new palette with the selective (lit-side) outline.
+- Grass edges over mud and cobble: 12 canonical tiles each (straight, inner,
+  outer corners) + any combination on demand, auto-picked by
+  `src/logic/autotile.ts`.
+- Light/depth: soft drop shadows under all characters and props, contact
+  shadow rows, pulsing soul-green staff light, smooth vignette, plague-dusk
+  grade.
+- Title: big glowing GRIMSHARD, dark-iron buttons, "Begin" disabled with a
+  "soon" tag. Gallery: Tiles / Edges / Characters / Props / Palette (32).
+- Test Village 20x11 (fills the screen): square, roads, two houses, stall,
+  cart, well, three graves, NPCs; tap-to-walk A*, long-press inspect, keys.
+- Tests: 146 Vitest (validator + dither per sprite, palette 32, autotile 10,
+  A* 5, scale incl. tablet/phone cases, outline, layout, recolour).
+  Smoke: 20/20 checks, 0 console errors, 0 external requests.
 
 ## Known bugs / limits
-- Test Village is drawn at 1x (the brief requires the whole 10x6 patch on
-  one 480x270 screen), so tiles are ~32 CSS px on a phone: tappable but small.
-- Web-font text is antialiased by the canvas (a few off-palette edge pixels).
-- Character shadows use 50% alpha (the only blended colour).
-- Not tested on a real phone; headless Chromium only (844x390 dpr 1 & 3,
-  390x844 portrait). Sound not verified by ear.
-- The artifact viewer warns about a "download link": unused Phaser
-  internals, not the game.
-- No save system yet (nothing worth saving).
+- Not tested on a real device; headless Chromium only. Sound not checked by ear.
+- Rotating or resizing so the integer scale changes restarts the current
+  scene (the village resets the player position).
+- On dpr-1 phones (cssScale 1) the 16 CSS px floor makes UI text larger and
+  the gallery tabs tight.
+- GRIMSHARD in Jacquard 12 blackletter capitals is stylised; readable at
+  tablet size, tighter on a small phone.
+- Grave/cart/stall were re-ramped automatically, not redrawn from scratch.
+- Artifact viewer warns about a "download link": unused Phaser internals.
+- No save system yet.
 
 ## Next step
-0.3 = full plague village: bigger map with a 2x scrolling camera, fog of
-war, turn system (player step = 1 turn, villagers move), first save to
-localStorage + save code.
+0.3 = plague village: larger map with a 2x scrolling camera, fog of war,
+turn system, first save to localStorage + save code.
