@@ -4,6 +4,8 @@ import './style.css';
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { TitleScene } from './scenes/TitleScene';
+import { GalleryScene } from './scenes/GalleryScene';
+import { VillageScene } from './scenes/VillageScene';
 import { GAME_W, GAME_H } from './data/config';
 import { PALETTE } from './art/palette';
 import { computeScale, isPortrait } from './logic/scale';
@@ -23,7 +25,7 @@ const game = new Phaser.Game({
   banner: false,
   scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
   input: { activePointers: 2 },
-  scene: [BootScene, TitleScene],
+  scene: [BootScene, TitleScene, GalleryScene, VillageScene],
 });
 
 /** Largest whole-number scale (in device pixels), letterboxed in #120e12. */
@@ -39,6 +41,7 @@ function fit(): void {
     canvas.style.top = `${s.top}px`;
   }
   game.scale.setZoom(s.cssScale);
+  game.registry.set('cssScale', s.cssScale); // buttons size their touch area from this
 }
 
 function drawRotateIcon(): void {
@@ -57,3 +60,6 @@ window.addEventListener('keydown', () => void unlockAudio(), { once: true, captu
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 drawRotateIcon();
 fit();
+
+// Read-only handle for the headless smoke test (tools/smoke.mjs).
+(window as unknown as { __PHASER_GAME__: Phaser.Game }).__PHASER_GAME__ = game;

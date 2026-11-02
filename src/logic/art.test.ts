@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PALETTE } from '../art/palette';
 import { gridToRgba, validateGrid, vignetteGrid } from '../art/grid';
-import { NECROMANCER_IDLE, PHONE_ICON, SOUL_MOTE, TILE_COBBLE, TILE_MUD } from '../art/sprites';
+import { NECROMANCER, PHONE_ICON, SOUL_MOTE, ALL_SPRITES } from '../art/sprites';
 import { CHAR_H, CHAR_W, TILE } from '../data/config';
 import { makeRng } from './rng';
 
@@ -23,12 +23,12 @@ describe('palette', () => {
 
 describe('sprites', () => {
   it('necromancer idle has 3 frames of 24x32 using only palette letters', () => {
-    expect(NECROMANCER_IDLE).toHaveLength(3);
-    NECROMANCER_IDLE.forEach((f, i) => validateGrid(f, CHAR_W, CHAR_H, `necro${i}`));
+    expect(NECROMANCER.frames).toHaveLength(3);
+    NECROMANCER.frames.forEach((f, i) => validateGrid(f, CHAR_W, CHAR_H, `necro${i}`));
   });
 
   it('ground tiles are 24x24, fully opaque, with no outline colour', () => {
-    for (const t of [TILE_COBBLE, TILE_MUD]) {
+    for (const t of ALL_SPRITES.filter((s) => /cobble|grass|mud/.test(s.key)).map((s) => s.frames[0])) {
       validateGrid(t, TILE, TILE);
       expect(t.join('')).not.toMatch(/[.a]/);
     }
@@ -41,7 +41,7 @@ describe('sprites', () => {
 
   it('every opaque character pixel touching transparency is outline or glow', () => {
     // 1px dark outline rule (soul glow at the staff tip is the exception)
-    const f = NECROMANCER_IDLE[0];
+    const f = NECROMANCER.frames[0];
     for (let y = 0; y < f.length; y++)
       for (let x = 0; x < f[0].length; x++) {
         const ch = f[y][x];
@@ -74,5 +74,17 @@ describe('rng', () => {
     expect([b(), b(), b()]).toEqual(xs);
     xs.forEach((x) => expect(x).toBeGreaterThanOrEqual(0));
     xs.forEach((x) => expect(x).toBeLessThan(1));
+  });
+});
+
+describe('ui panels', () => {
+  it('builds valid parchment/iron buttons of any size', async () => {
+    const { panelGrid } = await import('../art/ui');
+    for (const st of ['parchment', 'parchmentDown', 'iron', 'ironDown'] as const) {
+      const g = panelGrid(60, 34, st);
+      validateGrid(g, 60, 34, st);
+      expect(g[0][0]).toBe('.');
+      expect(g[0][1]).toBe('a');
+    }
   });
 });

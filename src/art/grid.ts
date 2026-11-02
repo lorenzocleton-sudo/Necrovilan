@@ -40,7 +40,13 @@ const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
  * Dithered vignette as a letter grid: palette-pure darkening toward the
  * edges (no alpha blending, so no off-palette colours).
  */
-export function vignetteGrid(w: number, h: number, letter: PaletteKey = 'a'): string[] {
+export function vignetteGrid(
+  w: number,
+  h: number,
+  letter: PaletteKey = 'a',
+  opts: { inner?: number; range?: number; max?: number } = {},
+): string[] {
+  const { inner = 0.4, range = 0.28, max = 1 } = opts;
   const rows: string[] = [];
   for (let y = 0; y < h; y++) {
     let row = '';
@@ -48,7 +54,7 @@ export function vignetteGrid(w: number, h: number, letter: PaletteKey = 'a'): st
       const nx = (x + 0.5) / w - 0.5;
       const ny = (y + 0.5) / h - 0.5;
       const d = Math.sqrt(nx * nx * 1.1 + ny * ny * 2.2); // ellipse
-      const strength = Math.min(1, Math.max(0, (d - 0.4) / 0.28));
+      const strength = Math.min(max, Math.max(0, (d - inner) / range));
       const threshold = (BAYER4[(y % 4) * 4 + (x % 4)] + 0.5) / 16;
       row += strength > threshold ? letter : TRANSPARENT;
     }

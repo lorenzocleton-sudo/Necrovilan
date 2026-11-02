@@ -55,3 +55,66 @@ A new colour requires an entry in docs/DECISIONS.md.
 `a b c` darks · `d e f g` stone · `h i j k` earth · `l m n` moss ·
 `o p q` roof · `r s t` warm (skin, blood, gold) · `u v` bone, grey-blue ·
 `w` soul-green · `x` bruise purple · `.` transparent.
+
+## How to make a sprite
+
+Every sprite is a `SpriteDef` (src/art/spriteDef.ts) written as literal
+letter grids in `src/art/sprites/{tiles,characters,props}.ts`, then added to
+`ALL_SPRITES` in `src/art/sprites.ts`. That is all: Boot builds the texture
+and idle animation, the Gallery shows it, and the Vitest validator
+(`src/logic/sprites.test.ts` -> `checkSprite`) fails the build if it breaks
+a rule.
+
+### Format
+```ts
+export const LANTERN: SpriteDef = {
+  name: 'Lantern',          // gallery label
+  key: 'lantern',           // unique texture key
+  category: 'prop',         // 'tile' | 'character' | 'prop'
+  w: 24, h: 32,             // every row of every frame must match
+  frameMs: 300,             // time per frame
+  sequence: [0, 1, 0, 2],   // optional playback order
+  anchor: { x: 0, y: 1 },   // props bottom-left; characters { x: 0.5, y: 1 }
+  footprint: { w: 1, h: 1 },// props: tiles blocked, from the bottom-left
+  edgeGlow: 'w',            // optional: letters allowed on the silhouette edge
+  shadow: false,            // characters: true (ellipse under the feet)
+  recolor: [...],           // optional per-instance palette swaps
+  frames: [[ /* h strings of w letters */ ]],
+};
+```
+
+### Rules the validator enforces
+- Each frame has exactly `h` rows of exactly `w` letters; all frames same size.
+- Only palette letters `a`..`x` and `.` (transparent).
+- Tiles: 24x24 and fully opaque (no `.`). Ground tiles never use `a`.
+- Characters: 24x32. Characters and props: every opaque pixel touching
+  transparency is the outline `a` (or an `edgeGlow` letter).
+- Recolour options are palette letters, same length as `from`, and slots
+  never share a source letter.
+
+### Rules you enforce by eye (check in the Gallery, detail view, grid on)
+- Light from the top-left: lightest ramp step on top/left edges, darkest on
+  bottom/right. 3 steps per material (e.g. stone `g f e`, earth `k j i`,
+  roof `q p o`, skin `r r q`).
+- Characters stand at bottom-centre of their tile: feet on rows 29-30,
+  outline on row 31, body roughly columns 5-18.
+- 3-frame idle: 0 rest, 1 upper body 1px down (breathe), 2 one small
+  detail (blink, glint, glow). Played 0,1,0,2.
+- Ground tiles must tile seamlessly; variants share the border ring so A
+  and B also tile with each other. Keep structured details (cracks,
+  pebbles, tufts) at least 1px inside the edge.
+- Living = warm, undead = cold. Soul-green `w` only for necromancy.
+- Recolour: give each slot its own source letters (peasant: hair `ih`,
+  tunic `tkj`, cap `po`, trousers `ed`) so swaps never bleed.
+
+### Example (12x8 headstone sketch, outlined, light top-left)
+```
+'...aaaaaa...',
+'..agggggfa..',
+'.aggfddffea.',
+'.agfddddfea.',
+'.agffddffea.',
+'.agfffffeea.',
+'.afeeeeeeda.',
+'..aaaaaaaa..',
+```

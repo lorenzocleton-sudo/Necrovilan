@@ -57,3 +57,65 @@ Newest at the bottom. Each entry: decision, main alternative, why.
 13. **Text antialiasing accepted for now.** Phaser renders web fonts with
     canvas antialiasing, so glyph edges have a few off-palette blend pixels.
     Alternative: bitmap fonts baked from the palette — revisit in 0.2.
+
+## 0.2 (2026-11-02)
+
+14. **One `SpriteDef` format** (src/art/spriteDef.ts) replaces bare grids.
+    0.1's palette letters, `gridToRgba`, `addGridSheet` are kept and reused;
+    `NECROMANCER_IDLE` became `NECROMANCER.frames` (same pixels). Alternative:
+    separate JSON/PNG-like files — rejected, TS gives type checks for free.
+
+15. **Validator lives in `src/logic/spriteCheck.ts`** and runs over
+    `ALL_SPRITES` in Vitest (one test per sprite), so `npm run test` fails on a
+    broken sprite. It also enforces the outline and tile-opacity rules.
+
+16. **Tile variants are separate sprites** (`tile-cobble-a` / `-b`, etc.), not a
+    `variants` field. Simpler for Boot/Gallery. Variants share the border ring
+    (cobble: border stones keep their tone; grass/mud: same noise field, only
+    interior tufts/pebbles differ), so A/B tile with each other. Map picks A or
+    B with a seeded hash (`variantAt`, ~1/3 B).
+
+17. **Sprites drafted by a scratch generator, committed as literal grids**
+    (same as 0.1 decision 6): material maps -> auto top-left shading ->
+    auto 4-neighbour outline. The grids are the source of truth.
+
+18. **Extra tile "Wall with door"** — the house front needs a door; it is a
+    wall tile with an arched plank door. 16 sprites total (9 tiles incl.
+    variants and door, 4 characters, 3 props).
+
+19. **Recolour = simultaneous letter swap per slot**, seed -> one option per
+    slot (`rollRecolor`). Targets must be palette letters (throws otherwise).
+    Peasant skin shade uses roof `q` so it never collides with clothes ramps.
+
+20. **Character shadow = 18x6 `a` ellipse at 50% alpha.** The only
+    alpha-blended colour in the world (requested); everything else stays
+    palette-pure.
+
+21. **Test Village is drawn at 1x** (240x144 patch centred in 480x270).
+    The brief requires the whole 10x6 patch to fit; 2x would be 288px tall
+    (> 270) and fractional zoom is banned. 0.3 brings a scrolling camera at 2x.
+
+22. **Y-sort = depth by the bottom pixel row** (`10 + feetY`) for props and
+    actors; the moving player re-sorts every frame. Walls/roof are ground
+    tiles (depth 0) because nothing can stand north of them in this patch.
+    Props are anchored bottom-left; overhang (stall awning) is not blocking.
+
+23. **Buttons: visual 30-34 game px, tap area padded to >= 44 CSS px** using
+    the live CSS scale (`registry.cssScale`). Alternative: 44 game px tall
+    buttons — too big at 4x on desktop and on a 270px-high screen.
+
+24. **Gallery detail scale = largest whole scale <= 6 that fits** (`fitScale`).
+    The 48x48 stall shows at x4 (x6 = 288px > screen height). The grid overlay
+    draws 24px tile lines plus the anchor point (gold dot).
+
+25. **A\*: 4-directional, Manhattan, deterministic tie-break** (lowest f, then
+    lowest h, then oldest). Linear open-list scan is fine for small maps;
+    swap in a binary heap when maps grow past ~50x50.
+
+26. **Tap vs long-press vs swipe**: tap = release within 12px of the press;
+    long-press (450 ms) on the village shows the tile's name (inspect);
+    swipe > 40px pages the gallery. A tap while walking re-plans after the
+    current step lands.
+
+27. **`window.__PHASER_GAME__` / `window.__GRIMSHARD__`** expose read-only
+    state for the headless smoke test (scene list, player tile).

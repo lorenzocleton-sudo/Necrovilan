@@ -30,6 +30,12 @@ export function unlockAudio(): Promise<void> {
 const SOUNDS = {
   /** soft, eerie, rising */
   soul: [0.7, 0, 180, 0.25, 0.35, 0.9, 0, 1.4, 1.6, 0, 0, 0, 0, 0, 2.5, 0, 0.18, 0.7, 0.1, 0.35, 900],
+  /** dry UI tick */
+  click: [0.35, 0, 520, 0, 0.01, 0.03, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.01],
+  /** soft footstep on stone/mud */
+  step: [0.3, 0, 110, 0, 0.004, 0.035, 4, 0, -20, 0, 0, 0, 0, 2.2, 0, 0, 0, 0.6, 0.01],
+  /** low thud: can't go there */
+  bump: [0.5, 0, 75, 0, 0.02, 0.12, 1, 2, -6, 0, 0, 0, 0, 0.8, 0, 0.2, 0, 0.5, 0.03],
 } as const;
 
 export type SoundName = keyof typeof SOUNDS;
