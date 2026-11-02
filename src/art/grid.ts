@@ -32,33 +32,3 @@ export function gridToRgba(grid: Grid): Uint8ClampedArray {
   }
   return out;
 }
-
-/** 4x4 Bayer matrix, values 0..15. */
-const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-
-/**
- * Dithered vignette as a letter grid: palette-pure darkening toward the
- * edges (no alpha blending, so no off-palette colours).
- */
-export function vignetteGrid(
-  w: number,
-  h: number,
-  letter: PaletteKey = 'a',
-  opts: { inner?: number; range?: number; max?: number } = {},
-): string[] {
-  const { inner = 0.4, range = 0.28, max = 1 } = opts;
-  const rows: string[] = [];
-  for (let y = 0; y < h; y++) {
-    let row = '';
-    for (let x = 0; x < w; x++) {
-      const nx = (x + 0.5) / w - 0.5;
-      const ny = (y + 0.5) / h - 0.5;
-      const d = Math.sqrt(nx * nx * 1.1 + ny * ny * 2.2); // ellipse
-      const strength = Math.min(max, Math.max(0, (d - inner) / range));
-      const threshold = (BAYER4[(y % 4) * 4 + (x % 4)] + 0.5) / 16;
-      row += strength > threshold ? letter : TRANSPARENT;
-    }
-    rows.push(row);
-  }
-  return rows;
-}

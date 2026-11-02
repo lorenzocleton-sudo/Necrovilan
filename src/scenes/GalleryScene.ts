@@ -1,27 +1,32 @@
 import Phaser from 'phaser';
 import { C, PALETTE, TRANSPARENT, hexToInt, type PaletteKey } from '../art/palette';
 import { ALL_SPRITES } from '../art/sprites';
-import type { SpriteCategory, SpriteDef } from '../art/spriteDef';
+import type { SpriteDef } from '../art/spriteDef';
 import { ensureSprite, idleAnimKey } from '../art/textures';
-import { recolorFrames } from '../logic/recolor';
+import { recolorSprite } from '../logic/recolor';
 import { fitScale, packPages } from '../logic/layout';
 import { GAME_W, GAME_H } from '../data/config';
 import { makeButton, text, type Button } from './ui';
+import { fontUnits, setupCamera, toUnits } from './view';
+import { softShadow } from './fx';
 
-type Tab = SpriteCategory | 'palette';
+type Tab = 'tile' | 'edge' | 'character' | 'prop' | 'palette';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'tile', label: 'Tiles' },
+  { id: 'edge', label: 'Edges' },
   { id: 'character', label: 'Characters' },
   { id: 'prop', label: 'Props' },
   { id: 'palette', label: 'Palette' },
 ];
-const LIST_SCALE = 4;
+const LIST_SCALE: Record<Exclude<Tab, 'palette'>, number> = { tile: 4, edge: 2, character: 4, prop: 4 };
 const DETAIL_MAX_SCALE = 6;
-const AREA = { x: 32, y: 42, w: 416, h: 226 };
-const LABEL_H = 14;
+const AREA = { x: 32, y: 38, w: 416, h: 230 };
 const SWIPE_PX = 40;
 
-/** Art Gallery: every sprite at x4, animated, by category; detail view; palette page. */
+const inTab = (s: SpriteDef, tab: Tab) =>
+  tab === 'edge' ? s.group === 'edge' : tab === 'tile' ? s.category === 'tile' && s.group !== 'edge' : s.category === tab;
+
+/** Art Gallery: every sprite animated, by category; transition tiles; detail view; palette page. */
 export class GalleryScene extends Phaser.Scene {
   private tab: Tab = 'tile';
   private page = 0;
@@ -45,20 +50,21 @@ export class GalleryScene extends Phaser.Scene {
     this.detail = [];
     this.detailCleanup = [];
     this.tabButtons = [];
-    this.cameras.main.setBackgroundColor(PALETTE.b);
+    setupCamera(this, PALETTE.b);
 
-    makeButton(this, 4, 4, 54, 30, 'Back', () => this.back(), { iron: true });
+    makeButton(this, 4, 4, 52, 30, 'Back', () => this.back());
     TABS.forEach((t, i) => {
-      this.tabButtons.push(makeButton(this, 64 + i * 84, 4, 80, 30, t.label, () => this.showTab(t.id), { iron: true, size: 11 }));
+      this.tabButtons.push(makeButton(this, 62 + i * 80, 4, 76, 30, t.label, () => this.showTab(t.id)));
     });
-    this.pageLabel = text(this, GAME_W - 8, 19, '', 10, PALETTE.f).setOrigin(1, 0.5);
-    this.prevBtn = makeButton(this, 2, 132, 26, 44, '<', () => this.turn(-1), { iron: true, size: 14 });
-    this.nextBtn = makeButton(this, GAME_W - 28, 132, 26, 44, '>', () => this.turn(1), { iron: true, size: 14 });
+    this.pageLabel = text(this, GAME_W - 4, GAME_H - 2, '', 10, PALETTE.f).setOrigin(1, 1);
+    this.prevBtn = makeButton(this, 2, 132, 26, 44, '<', () => this.turn(-1), { size: 14 });
+    this.nextBtn = makeButton(this, GAME_W - 28, 132, 26, 44, '>', () => this.turn(1), { size: 14 });
 
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
       if (this.detailOpen) return;
-      const dx = p.upX - p.downX;
-      if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(p.upY - p.downY)) this.turn(dx < 0 ? 1 : -1);
+      const dx = toUnits(this, p.upX - p.downX);
+      const dy = toUnits(this, p.upY - p.downY);
+      if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) this.turn(dx < 0 ? 1 : -1);
     });
     const kb = this.input.keyboard;
     kb?.on('keydown-ESC', () => this.back());
@@ -99,7 +105,7 @@ export class GalleryScene extends Phaser.Scene {
       this.pageCount = 1;
       this.renderPalette();
     } else {
-      this.renderSprites(ALL_SPRITES.filter((s) => s.category === this.tab));
+      this.renderSprites(ALL_SPRITES.filter((s) => inTab(s, this.tab)), LIST_SCALE[this.tab]);
     }
     const multi = this.pageCount > 1;
     this.prevBtn.setVisible(multi && this.page > 0);
@@ -107,42 +113,54 @@ export class GalleryScene extends Phaser.Scene {
     this.pageLabel.setText(multi ? `${this.page + 1}/${this.pageCount}` : '');
   }
 
-  private renderSprites(defs: SpriteDef[]): void {
-    const boxes = defs.map((d) => ({ w: d.w * LIST_SCALE, h: d.h * LIST_SCALE + LABEL_H }));
+  private renderSprites(defs: SpriteDef[], maxScale: number): void {
+    const labelH = fontUnits(this, 10) + 3;
+    const charW = fontUnits(this, 10) * 0.6;
+    const scaleOf = (d: SpriteDef) => fitScale(d.w, d.h, AREA.w, AREA.h - labelH, maxScale);
+    const labelOf = (d: SpriteDef) => d.label ?? d.name;
+    const boxes = defs.map((d) => ({
+      w: Math.max(d.w * scaleOf(d), Math.ceil(labelOf(d).length * charW)),
+      h: d.h * scaleOf(d) + labelH,
+    }));
     const pages = packPages(boxes, AREA.w, AREA.h, 8, 4);
     this.pageCount = pages.length;
     for (const pl of pages[this.page] ?? []) {
       const def = defs[pl.index];
-      const x = AREA.x + pl.x;
+      const s = scaleOf(def);
+      const sw = def.w * s;
+      const sh = def.h * s;
+      const x = AREA.x + pl.x + Math.floor((boxes[pl.index].w - sw) / 2);
       const y = AREA.y + pl.y;
-      const sw = def.w * LIST_SCALE;
-      const sh = def.h * LIST_SCALE;
-      if (def.shadow) this.content.push(this.shadowAt(x + sw / 2, y + sh - 3 * LIST_SCALE, LIST_SCALE));
-      const spr = this.add.sprite(x, y, def.key, 0).setOrigin(0).setScale(LIST_SCALE);
+      if (def.shadow) this.content.push(softShadow(this, x + sw / 2 + s, y + sh - 1.5 * s, 20 * s, 7 * s));
+      const spr = this.add.sprite(x, y, def.key, 0).setOrigin(0).setScale(s);
       if (def.frames.length > 1) spr.play(idleAnimKey(def.key));
       spr.setInteractive({ useHandCursor: true });
       spr.on('pointerup', (p: Phaser.Input.Pointer) => {
-        if (Math.hypot(p.upX - p.downX, p.upY - p.downY) < 12) this.openDetail(def);
+        if (toUnits(this, Math.hypot(p.upX - p.downX, p.upY - p.downY)) < 12) this.openDetail(def);
       });
-      this.content.push(spr, text(this, x + sw / 2, y + sh + 2, def.name, 10).setOrigin(0.5, 0));
+      this.content.push(spr, text(this, x + sw / 2, y + sh + 1, labelOf(def), 10).setOrigin(0.5, 0));
     }
-  }
-
-  private shadowAt(cx: number, cy: number, scale: number): Phaser.GameObjects.Image {
-    return this.add.image(cx, cy, 'shadow').setScale(scale).setAlpha(0.5);
+    if (this.tab === 'edge') {
+      this.content.push(text(this, AREA.x, GAME_H - 2, 'Grass over mud, then cobble · auto-tiled', 10, PALETTE.f).setOrigin(0, 1));
+    }
   }
 
   private renderPalette(): void {
     const keys = Object.keys(PALETTE) as PaletteKey[];
-    const cw = 72, ch = 52, cols = 6;
+    const cols = 8, cw = 56, swH = 26;
+    const ch = swH + fontUnits(this, 10) + 8;
     const x0 = Math.floor((GAME_W - cols * cw) / 2) + 4;
     keys.forEach((k, i) => {
       const x = x0 + (i % cols) * cw;
       const y = AREA.y + 4 + Math.floor(i / cols) * ch;
-      const r = this.add.rectangle(x, y, cw - 8, 28, hexToInt(PALETTE[k])).setOrigin(0).setStrokeStyle(1, hexToInt(C.ink));
-      this.content.push(r, text(this, x, y + 31, `${k}  ${PALETTE[k]}`, 9, PALETTE.g));
+      const r = this.add.rectangle(x, y, cw - 8, swH, hexToInt(PALETTE[k])).setOrigin(0).setStrokeStyle(1, hexToInt(PALETTE.A));
+      const light = 'gKNQrtuUwf'.includes(k);
+      const letter = text(this, x + 3, y + 1, k, 12, light ? PALETTE.A : PALETTE.U);
+      this.content.push(r, letter, text(this, x, y + swH + 2, PALETTE[k], 10, PALETTE.g));
     });
-    this.content.push(text(this, GAME_W / 2, GAME_H - 8, 'Locked 24-colour palette · letters are used in sprite grids', 9, PALETTE.e).setOrigin(0.5, 1));
+    this.content.push(
+      text(this, GAME_W / 2, GAME_H - 2, 'Locked 32-colour palette · ramps run deep → highlight', 10, PALETTE.f).setOrigin(0.5, 1),
+    );
   }
 
   // ---------------- detail view ----------------
@@ -157,14 +175,14 @@ export class GalleryScene extends Phaser.Scene {
       return o;
     };
     add(this.add.rectangle(0, 0, GAME_W, GAME_H, hexToInt(PALETTE.b)).setOrigin(0).setInteractive());
-    const close = makeButton(this, 4, 4, 54, 30, 'Close', () => this.closeDetail(), { iron: true, depth: D + 1 });
-    add(text(this, 68, 19, def.name, 14).setOrigin(0, 0.5));
+    const close = makeButton(this, 4, 4, 60, 30, 'Close', () => this.closeDetail(), { depth: D + 1 });
+    add(text(this, 72, 19, def.name, 14, C.boneBright).setOrigin(0, 0.5));
 
-    const area = { x: 8, y: 42, w: 300, h: 224 };
+    const area = { x: 8, y: 40, w: 300, h: 226 };
     const s = fitScale(def.w, def.h, area.w, area.h, DETAIL_MAX_SCALE);
     const sx = area.x + Math.floor((area.w - def.w * s) / 2);
     const sy = area.y + Math.floor((area.h - def.h * s) / 2);
-    if (def.shadow) add(this.shadowAt(sx + (def.w * s) / 2, sy + def.h * s - 3 * s, s));
+    if (def.shadow) add(softShadow(this, sx + (def.w * s) / 2 + s, sy + def.h * s - 1.5 * s, 20 * s, 7 * s));
     const spr = add(this.add.sprite(sx, sy, def.key, 0).setOrigin(0).setScale(s));
     if (def.frames.length > 1) spr.play(idleAnimKey(def.key));
 
@@ -185,48 +203,49 @@ export class GalleryScene extends Phaser.Scene {
     };
 
     const info = [
-      `${def.w}x${def.h} ${def.category}`,
+      `${def.w}x${def.h} ${def.group ?? def.category}`,
       `${def.frames.length} frame${def.frames.length > 1 ? 's' : ''}${def.frames.length > 1 ? ` · ${def.frameMs} ms` : ''}`,
       `shown at x${s}`,
-      def.anchor ? (def.category === 'character' ? 'anchor: bottom-centre' : 'anchor: bottom-left') : 'anchor: top-left',
-      def.footprint ? `blocks ${def.footprint.w}x${def.footprint.h} tile` : '',
+      def.footprint ? `blocks ${def.footprint.w}x${def.footprint.h} tiles` : '',
     ].filter(Boolean);
-    add(text(this, 316, 42, info.join('\n'), 9, PALETTE.f).setLineSpacing(1));
-    const lettersLabel = add(text(this, 316, 104, 'Palette letters used:', 9, C.bone));
+    const infoText = add(text(this, 316, 40, info.join('\n'), 10, PALETTE.g));
+    const lettersY = infoText.y + infoText.displayHeight + 6;
+    add(text(this, 316, lettersY, 'Letters used:', 10, C.bone));
     const swatches: Phaser.GameObjects.GameObject[] = [];
     const drawLetters = () => {
       swatches.forEach((o) => o.destroy());
       swatches.length = 0;
-      const frames = seed !== undefined && def.recolor ? recolorFrames(def.frames, def.recolor, seed) : def.frames;
+      const frames = seed !== undefined && def.recolor ? recolorSprite(def, seed) : def.frames;
       const used = [...new Set(frames.flat().join(''))].filter((ch) => ch !== TRANSPARENT).sort() as PaletteKey[];
+      const rowH = fontUnits(this, 10) + 2;
       used.forEach((k, i) => {
-        const x = 316 + Math.floor(i / 9) * 80;
-        const y = lettersLabel.y + 14 + (i % 9) * 12;
-        const sq = this.add.rectangle(x, y, 9, 9, hexToInt(PALETTE[k])).setOrigin(0).setStrokeStyle(1, hexToInt(PALETTE.e)).setDepth(D);
-        const t = text(this, x + 13, y - 1, `${k} ${PALETTE[k]}`, 9, PALETTE.g).setDepth(D);
+        const x = 316 + (i % 5) * 32;
+        const y = lettersY + rowH + 2 + Math.floor(i / 5) * rowH;
+        const sq = this.add.rectangle(x, y + 2, 10, 10, hexToInt(PALETTE[k])).setOrigin(0).setStrokeStyle(1, hexToInt(PALETTE.e)).setDepth(D);
+        const t = text(this, x + 13, y, k, 10, PALETTE.g).setDepth(D);
         swatches.push(sq, t);
       });
     };
     drawLetters();
     this.detailCleanup.push(() => swatches.forEach((o) => o.destroy()));
 
-    const gridBtn = makeButton(this, 316, 234, 74, 30, 'Grid: off', () => {
+    const gridBtn = makeButton(this, 316, 234, 76, 30, 'Grid: off', () => {
       gridOn = !gridOn;
       gridBtn.setLabel(gridOn ? 'Grid: on' : 'Grid: off');
       drawGrid();
-    }, { iron: true, depth: D + 1, size: 10 });
+    }, { depth: D + 1 });
     const buttons = [close, gridBtn];
     if (def.recolor?.length) {
       let n = 0;
       buttons.push(
-        makeButton(this, 396, 234, 78, 30, 'Recolour', () => {
+        makeButton(this, 396, 234, 80, 30, 'Recolour', () => {
           n += 1;
           seed = n;
           const key = ensureSprite(this, def, seed);
           spr.setTexture(key, 0);
           if (def.frames.length > 1) spr.play(idleAnimKey(key));
           drawLetters();
-        }, { depth: D + 1, size: 10 }),
+        }, { depth: D + 1 }),
       );
     }
     this.detailCleanup.push(() => buttons.forEach((b) => b.destroy()));

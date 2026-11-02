@@ -1,7 +1,8 @@
 import type { Grid } from './grid';
 import type { SpriteDef } from './spriteDef';
 import { NECROMANCER, PEASANT, GUARD, SKELETON } from './sprites/characters';
-import { GRAVE, CART, STALL } from './sprites/props';
+import { GRAVE, CART, STALL, WELL, HOUSE } from './sprites/props';
+import { EDGE_SPRITES } from './edges';
 import {
   TILE_COBBLE_A, TILE_COBBLE_B, TILE_GRASS_A, TILE_GRASS_B, TILE_MUD_A, TILE_MUD_B,
   TILE_WALL, TILE_WALL_DOOR, TILE_ROOF,
@@ -15,21 +16,12 @@ import {
 export const ALL_SPRITES: readonly SpriteDef[] = [
   TILE_COBBLE_A, TILE_COBBLE_B, TILE_GRASS_A, TILE_GRASS_B, TILE_MUD_A, TILE_MUD_B,
   TILE_WALL, TILE_WALL_DOOR, TILE_ROOF,
+  ...EDGE_SPRITES,
   NECROMANCER, PEASANT, GUARD, SKELETON,
-  GRAVE, CART, STALL,
+  GRAVE, CART, STALL, WELL, HOUSE,
 ];
 
-export { NECROMANCER, PEASANT, GUARD, SKELETON, GRAVE, CART, STALL };
-
-/** Character ground shadow, 18x6, drawn at ~50% alpha. */
-export const SHADOW: Grid = [
-  '....aaaaaaaaaa....',
-  '.aaaaaaaaaaaaaaaa.',
-  'aaaaaaaaaaaaaaaaaa',
-  'aaaaaaaaaaaaaaaaaa',
-  '.aaaaaaaaaaaaaaaa.',
-  '....aaaaaaaaaa....',
-];
+export { NECROMANCER, PEASANT, GUARD, SKELETON, GRAVE, CART, STALL, WELL, HOUSE };
 
 /** Phone icon for the rotate screen, 12x20. */
 export const PHONE_ICON: Grid = [

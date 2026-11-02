@@ -1,22 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_SPRITES, PEASANT, SHADOW } from '../art/sprites';
+import { ALL_SPRITES, PEASANT } from '../art/sprites';
 import { checkSprite } from './spriteCheck';
-import { recolorFrames, recolorGrid, rollRecolor } from './recolor';
+import { recolorFrames, recolorGrid, recolorSprite, rollRecolor } from './recolor';
 import { PALETTE } from '../art/palette';
 import type { SpriteDef } from '../art/spriteDef';
-import { validateGrid } from '../art/grid';
+import { longestCheckerRun, MAX_CHECKER_RUN } from './dither';
 
 describe('sprite registry', () => {
-  it('holds every reference sprite (9 tiles, 4 characters, 3 props)', () => {
-    const count = (c: string) => ALL_SPRITES.filter((s) => s.category === c).length;
+  it('holds every reference sprite (9 tiles, 24 edge tiles, 4 characters, 5 props)', () => {
+    const count = (c: string) => ALL_SPRITES.filter((s) => s.category === c && s.group !== 'edge').length;
     expect(count('tile')).toBe(9);
+    expect(ALL_SPRITES.filter((s) => s.group === 'edge')).toHaveLength(24);
     expect(count('character')).toBe(4);
-    expect(count('prop')).toBe(3);
+    expect(count('prop')).toBe(5);
     expect(new Set(ALL_SPRITES.map((s) => s.key)).size).toBe(ALL_SPRITES.length);
   });
 
   it.each(ALL_SPRITES.map((s) => [s.key, s] as const))('%s passes the validator', (_k, s) => {
     expect(checkSprite(s)).toEqual([]);
+  });
+
+  it.each(ALL_SPRITES.map((s) => [s.key, s] as const))('%s has no checkerboard dithering', (_k, s) => {
+    for (const f of s.frames) expect(longestCheckerRun(f)).toBeLessThanOrEqual(MAX_CHECKER_RUN);
   });
 
   it('characters have a 3-frame idle and a bottom-centre anchor', () => {
@@ -31,16 +36,27 @@ describe('sprite registry', () => {
     for (const base of ['cobble', 'grass', 'mud']) {
       const [a, b] = ['a', 'b'].map((v) => ALL_SPRITES.find((s) => s.key === `tile-${base}-${v}`)!.frames[0]);
       expect(a).not.toEqual(b);
-      if (base === 'cobble') {
-        // structured tile: the outer ring is identical in both variants
-        expect(b[0]).toBe(a[0]);
-        expect(b[23]).toBe(a[23]);
-        expect(b.map((r) => r[0] + r[23])).toEqual(a.map((r) => r[0] + r[23]));
-      }
+      // the outer ring is identical in both variants
+      expect(b[0]).toBe(a[0]);
+      expect(b[23]).toBe(a[23]);
+      expect(b.map((r) => r[0] + r[23])).toEqual(a.map((r) => r[0] + r[23]));
     }
   });
 
-  it('shadow grid is valid', () => validateGrid(SHADOW, 18, 6));
+  it('ground tiles have clear value contrast: mud darkest, grass mid, cobble lightest', async () => {
+    const { hexToRgb, PALETTE } = await import('../art/palette');
+    const lum = (key: string) => {
+      const f = ALL_SPRITES.find((s) => s.key === key)!.frames[0].join('');
+      let sum = 0;
+      for (const ch of f) {
+        const [r, g, b] = hexToRgb(PALETTE[ch as keyof typeof PALETTE]);
+        sum += 0.299 * r + 0.587 * g + 0.114 * b;
+      }
+      return sum / f.length;
+    };
+    expect(lum('tile-mud-a') + 25).toBeLessThan(lum('tile-grass-a'));
+    expect(lum('tile-grass-a') + 6).toBeLessThan(lum('tile-cobble-a'));
+  });
 });
 
 describe('validator catches broken sprites', () => {
@@ -52,6 +68,12 @@ describe('validator catches broken sprites', () => {
   it('frames of different size', () =>
     expect(checkSprite({ ...ok, frames: [ok.frames[0], ['aaaa', 'aaaa', 'aaaa']] }).join()).toMatch(/frame 1 row 0: width 4/));
   it('missing outline on a prop', () => expect(checkSprite({ ...ok, frames: [['.g.', 'aga', 'aaa']] }).join()).toMatch(/without outline/));
+  it('deep shade allowed on the lit side only', () => {
+    expect(checkSprite({ ...ok, frames: [['.da', 'dga', 'aaa']] })).toEqual([]);
+    expect(checkSprite({ ...ok, frames: [['aaa', 'agd', 'aaa']] }).join()).toMatch(/without outline/);
+  });
+  it('checkerboard dither', () =>
+    expect(checkSprite({ ...ok, category: 'tile', w: 24, h: 24, frames: [Array.from({ length: 24 }, (_, y) => (y % 2 ? 'mn' : 'nm').repeat(12))] }).join()).toMatch(/checkerboard/));
   it('transparent tile', () =>
     expect(checkSprite({ ...ok, category: 'tile', w: 24, h: 24, frames: [Array(24).fill('.'.repeat(24))] }).join()).toMatch(/opaque/));
   it('bad sequence', () => expect(checkSprite({ ...ok, sequence: [0, 3] }).join()).toMatch(/sequence index 3/));
@@ -70,7 +92,7 @@ describe('recolour', () => {
     const slots = PEASANT.recolor!;
     expect(rollRecolor(slots, 7)).toEqual(rollRecolor(slots, 7));
     for (let seed = 1; seed < 40; seed++) {
-      const frames = recolorFrames(PEASANT.frames, slots, seed);
+      const frames = recolorSprite(PEASANT, seed);
       expect(checkSprite({ ...PEASANT, frames })).toEqual([]);
       for (const ch of frames.join('').replace(/[.,]/g, '')) expect(ch in PALETTE).toBe(true);
     }

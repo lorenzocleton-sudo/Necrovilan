@@ -1,5 +1,5 @@
 /** Global constants. Internal resolution is fixed by docs/STYLE.md. */
-export const VERSION = '0.2';
+export const VERSION = '0.2.1';
 export const GAME_W = 480;
 export const GAME_H = 270;
 export const TILE = 24;

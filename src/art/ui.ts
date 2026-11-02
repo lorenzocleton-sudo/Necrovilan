@@ -1,22 +1,24 @@
 import { TRANSPARENT } from './palette';
 
-export type PanelStyle = 'parchment' | 'parchmentDown' | 'iron' | 'ironDown';
+export type PanelStyle = 'parchment' | 'iron' | 'ironDown' | 'ironOff' | 'ironSel';
 
-const FILL: Record<PanelStyle, { body: string; lit: string; dim: string; speck: string }> = {
-  parchment: { body: 'g', lit: 'u', dim: 'k', speck: 'f' },
-  parchmentDown: { body: 'k', lit: 'j', dim: 'g', speck: 'j' },
-  iron: { body: 'c', lit: 'e', dim: 'b', speck: 'b' },
-  ironDown: { body: 'b', lit: 'a', dim: 'c', speck: 'a' },
+/*
+ * Buttons are dark iron: 1px outline with clipped corners, slate fill, 1px
+ * light-stone bevel top-left and deepest-dark bevel bottom-right. Pressed:
+ * soul-green border, bevel inverted. Parchment is for panels only.
+ * Flat fills, no specks or dithering.
+ */
+const STYLE: Record<PanelStyle, { border: string; lit: string; dark: string; body: string; inner: string }> = {
+  iron: { border: 'a', lit: 'e', dark: 'A', body: 'c', inner: 'c' },
+  ironDown: { border: 'w', lit: 'A', dark: 'e', body: 'b', inner: 'b' },
+  ironSel: { border: 'a', lit: 'x', dark: 'A', body: 'b', inner: 'b' },
+  ironOff: { border: 'a', lit: 'c', dark: 'A', body: 'b', inner: 'b' },
+  parchment: { border: 'a', lit: 'U', dark: 'k', body: 'g', inner: 'u' },
 };
 
-/**
- * Button / panel as a letter grid: 1px ink outline with clipped corners,
- * 2px iron frame (lit top-left, dark bottom-right, rivets), worn parchment
- * or dark iron inside with a 1px bevel. Pressed styles invert the bevel.
- */
+/** Button / panel as a letter grid. */
 export function panelGrid(w: number, h: number, style: PanelStyle): string[] {
-  const f = FILL[style];
-  const down = style.endsWith('Down');
+  const f = STYLE[style];
   const rows: string[] = [];
   for (let y = 0; y < h; y++) {
     let row = '';
@@ -25,12 +27,9 @@ export function panelGrid(w: number, h: number, style: PanelStyle): string[] {
       const corner = (x === 0 || x === w - 1) && (y === 0 || y === h - 1);
       let ch: string;
       if (corner) ch = TRANSPARENT;
-      else if (edge === 0) ch = 'a';
-      else if (edge === 1) ch = x === 1 || y === 1 ? (down ? 'd' : 'f') : down ? 'f' : 'd';
-      else if (edge === 2) ch = 'e';
-      else if (edge === 3) ch = x === 3 || y === 3 ? (down ? f.dim : f.lit) : down ? f.lit : f.dim;
-      else ch = (x * 7 + y * 13) % 23 === 0 ? f.speck : f.body;
-      if (edge === 2 && (x === 2 || x === w - 3) && (y === 2 || y === h - 3)) ch = 'g'; // rivets
+      else if (edge === 0) ch = f.border;
+      else if (edge === 1) ch = x === 1 || y === 1 ? (x === w - 2 || y === h - 2 ? f.body : f.lit) : f.dark;
+      else ch = y < h / 2 ? f.inner : f.body;
       row += ch;
     }
     rows.push(row);

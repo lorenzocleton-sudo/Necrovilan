@@ -15,9 +15,26 @@ other accent.
 
 ## Light and shading
 - Light from the top-left.
-- 3-step shade ramp per material.
+- 4-5 step ramp per material: deep, dark, mid, light, highlight.
 - Shadows shift toward purple, highlights toward yellow.
-- 1px near-black outline on characters, items, props; none on ground.
+- Value contrast between grounds: mud darkest, grass mid, cobble lightest
+  (unit-tested).
+- 1px dark outline on characters, items, props; none on ground.
+- Selective outline on characters: on the lit top-left side the outline is
+  the darkest shade of the wrapped material (`b d H L O v`), black elsewhere.
+  Applied automatically by `withLitOutline` (src/art/outline.ts).
+- NO checkerboard or ordered dithering, anywhere. Texture = clustered pixel
+  clumps (tufts, pebbles, puddles, stone blocks). The validator fails any
+  sprite with a 2x2 checkerboard repeated more than 3 times in a row.
+- Soft drop shadow (deepest dark ~45%, offset down-right) under every
+  character and prop; contact-shadow rows where walls meet the ground; the
+  roof overhang casts a band on the wall below it.
+- Light effects are screen-resolution, not pixel art: soul-green additive
+  glow from the necromancer's staff (gentle pulse), smooth dark vignette,
+  faint cool-purple "plague dusk" multiply grade over the world.
+  Holy-gold light is reserved for later.
+- Grass meets mud/cobble through auto-tiled edge tiles (irregular tufts,
+  lit rim, shadow on the ground below) — never a hard square seam.
 - Living = warm colours; undead = cold (bone, grey-blue, green glow).
 
 ## Animation
@@ -28,8 +45,13 @@ other accent.
 Small stylised pixel blood/bone bits, never graphic.
 
 ## UI
-Dark iron + worn parchment panels, 1px bevel, bottom hotbar, top bars for
-HP / Essence / Souls.
+- All text is rasterised at the screen's real resolution (never small pixel
+  text scaled up): Pixelify Sans, at least 16 CSS px, bone on dark, thin
+  deepest-dark stroke when over the world.
+- Buttons: dark iron — slate fill, 1px light-stone bevel top-left,
+  deepest-dark bevel bottom-right, bright-bone label; soul-green border while
+  pressed; disabled = dimmed + small "soon" tag. Parchment only for panels.
+- Later: bottom hotbar, top bars for HP / Essence / Souls.
 
 ## Fonts
 Titles: Jacquard 12. Everything else: Pixelify Sans.
@@ -37,24 +59,26 @@ Titles: Jacquard 12. Everything else: Pixelify Sans.
 ## Sound
 Short synthesised SFX, low drone ambience, no bright melodies.
 
-## LOCKED PALETTE (24)
-| group | colours |
+## LOCKED PALETTE (32)
+| group | colours (deep -> highlight) |
 |---|---|
-| darks | `#120e12` `#231a22` `#3a2c34` |
-| stone | `#4b4a52` `#6d6a6e` `#9a958f` `#c9c2b2` |
-| earth | `#3b2a1e` `#5c4130` `#7f5d42` `#a8835c` |
-| moss | `#2f3a24` `#4a5a32` `#6f7d45` |
-| roof | `#5e2a22` `#8c3f2f` `#b7623f` |
-| warm | `#d9a37e` `#8a2f2f` `#c49a3a` |
-| bone/undead | `#e6dfc8` `#7d8a96` |
-| necromancy | `#7cffb2` (soul-green) `#5a2d6e` (bruise purple) |
+| darks | `A #0a080b` `a #120e12` `b #231a22` `c #3a2c34` |
+| stone | `d #4b4a52` `e #6d6a6e` `f #9a958f` `g #c9c2b2` |
+| earth | `H #2a1f17` `h #3b2a1e` `i #5c4130` `j #7f5d42` `k #a8835c` `K #c8a274` |
+| moss | `L #1f2818` `l #2f3a24` `m #4a5a32` `n #6f7d45` `N #8f9c58` |
+| roof | `O #3d1a16` `o #5e2a22` `p #8c3f2f` `q #b7623f` `Q #d98a5a` |
+| warm | `r #d9a37e` (skin) `s #8a2f2f` (blood) `t #c49a3a` (gold) |
+| bone/undead | `v #7d8a96` `u #e6dfc8` `U #f2ecd8` |
+| necromancy | `w #7cffb2` (soul-green) `x #5a2d6e` (bruise purple) |
 
 A new colour requires an entry in docs/DECISIONS.md.
 
 ### Letter codes (src/art/palette.ts)
-`a b c` darks · `d e f g` stone · `h i j k` earth · `l m n` moss ·
-`o p q` roof · `r s t` warm (skin, blood, gold) · `u v` bone, grey-blue ·
-`w` soul-green · `x` bruise purple · `.` transparent.
+Lowercase as before; the 8 colours added in 0.2.1 are UPPERCASE, and the
+uppercase of a letter is the extra end of that ramp: `A` deepest dark,
+`H` deep earth, `K` earth highlight, `L` deep moss, `N` moss highlight,
+`O` deep roof, `Q` roof highlight, `U` bright bone. `.` = transparent.
+Robe ramp (necromancer): `A b c x`.
 
 ## How to make a sprite
 
@@ -85,17 +109,19 @@ export const LANTERN: SpriteDef = {
 
 ### Rules the validator enforces
 - Each frame has exactly `h` rows of exactly `w` letters; all frames same size.
-- Only palette letters `a`..`x` and `.` (transparent).
-- Tiles: 24x24 and fully opaque (no `.`). Ground tiles never use `a`.
+- Only palette letters and `.` (transparent).
+- Tiles: 24x24 and fully opaque (no `.`). Ground tiles never use `a`/`A`.
+- No checkerboard dithering (2x2 alternating pattern > 3 in a row).
 - Characters: 24x32. Characters and props: every opaque pixel touching
-  transparency is the outline `a` (or an `edgeGlow` letter).
+  transparency on the right/bottom is the outline `a`/`A` (or an `edgeGlow`
+  letter); on the lit top/left side it may also be a deep shade `b d H L O v`.
 - Recolour options are palette letters, same length as `from`, and slots
   never share a source letter.
 
 ### Rules you enforce by eye (check in the Gallery, detail view, grid on)
 - Light from the top-left: lightest ramp step on top/left edges, darkest on
-  bottom/right. 3 steps per material (e.g. stone `g f e`, earth `k j i`,
-  roof `q p o`, skin `r r q`).
+  bottom/right. Use the full ramp (e.g. earth `K k j i h H`, roof
+  `Q q p o O`, moss `N n m l L`, skin `r q`).
 - Characters stand at bottom-centre of their tile: feet on rows 29-30,
   outline on row 31, body roughly columns 5-18.
 - 3-frame idle: 0 rest, 1 upper body 1px down (breathe), 2 one small

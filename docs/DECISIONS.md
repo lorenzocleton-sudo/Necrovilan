@@ -119,3 +119,63 @@ Newest at the bottom. Each entry: decision, main alternative, why.
 
 27. **`window.__PHASER_GAME__` / `window.__GRIMSHARD__`** expose read-only
     state for the headless smoke test (scene list, player tile).
+
+## 0.2.1 (2026-11-02) — style deepening
+
+28. **Text at device resolution via the canvas size, not a second camera.**
+    The canvas backing store is now the real device-pixel size (480·D x 270·D,
+    D = integer device pixels per game pixel) and each scene's main camera
+    zooms the 480x270 world by D. Text objects keep game-unit coordinates but
+    render with `resolution = D`, so glyphs land 1:1 on device pixels.
+    Alternative: a separate unzoomed UI camera with its own coordinate system —
+    rejected: every scene would need two layouts and input mapping per camera.
+    Pixel art stays integer-scaled (zoom D, nearest-neighbour, roundPixels).
+    A change of D (rotation, window resize) restarts the running scene.
+    (`src/scenes/view.ts`, `src/main.ts`.)
+
+29. **Text size floor = 16 CSS px** computed live: `fontUnits(design)` raises
+    any size below 16/cssScale game units. At phone scale 1.33 that is 12 units.
+
+30. **Palette 24 -> 32 with UPPERCASE letters** for the 8 new colours (the
+    uppercase of a letter extends that letter's ramp). Alternative: y, z and
+    digits — only 2 lowercase letters were left, and mnemonics matter.
+
+31. **Dither ban is a validator rule** (`src/logic/dither.ts`): fails a sprite
+    with a 2x2 checkerboard run > 3 in either direction. Old Bayer vignette
+    grid deleted.
+
+32. **Smooth effects are canvas gradients with LINEAR filtering**
+    (`src/scenes/fx.ts`): drop shadows, soul light (ADD blend), vignette,
+    dusk grade (MULTIPLY rectangle, lavender, alpha 0.28). They are the only
+    non-palette pixels in the world, deliberately, like the 0.2 shadow.
+
+33. **Edge tiles are composed in code** (`src/art/edges.ts`) from the grass
+    tile and the ground tile through a tufted mask, then shaded (lit rim,
+    deep-moss underside, 2px ground shadow below / 1px right). Alternative:
+    24+ hand grids — too many to keep consistent. The 12 canonical ones per
+    ground are registered sprites (validator + gallery); other combinations
+    are built on demand and cached.
+
+34. **Autotile = 4-neighbour edges + diagonal "nub" only when both adjacent
+    sides are clear** (`src/logic/autotile.ts`). Naming from the grass's
+    point of view: two grass sides = inner corner, diagonal only = outer
+    corner. Mud/cobble seams stay hard (a road entering a square).
+
+35. **House is one 72x72 prop (3x3 tiles, all blocking)** instead of roof/wall
+    ground tiles, so it can have an overhang, a ridge, a chimney and its own
+    shadow band. The roof/wall/door tiles remain in the gallery for later
+    modular buildings. The second house is the same sprite mirrored.
+
+36. **Selective outline is a pass, not hand-drawn** (`withLitOutline`): the
+    grids keep plain `a`, the pass swaps lit-side outline pixels for the deep
+    shade of the material. Recolour runs on the raw grid first, then the pass
+    (otherwise swapped letters break the rule).
+
+37. **Grave, cart and stall got an automatic re-ramp** (one-step rim light on
+    top-left edges, one-step deeper on bottom-right edges) instead of a full
+    redraw; silhouettes kept. House, well, grass, mud, roof, wall and the
+    necromancer were drawn fresh (scratch generator for the tiles/house/well,
+    by hand for the necromancer), committed as literal grids.
+
+38. **"Begin" is a disabled button** (dimmed, "soon" tag, thud sound, hint
+    line) until the plague village exists.

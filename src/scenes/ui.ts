@@ -2,21 +2,42 @@ import Phaser from 'phaser';
 import { C, PALETTE } from '../art/palette';
 import { ensurePanel } from '../art/textures';
 import { play } from '../audio/sfx';
+import { cssScale, deviceScale, fontUnits } from './view';
 
 export const UI_FONT = '"Pixelify Sans", monospace';
 export const TITLE_FONT = '"Jacquard 12", serif';
 /** Touch targets must be at least this many CSS px (header rule). */
 const MIN_TOUCH_CSS = 44;
+/** Default UI text size in game units (>= 16 CSS px on phones; raised further where needed). */
+export const UI_SIZE = 12;
 
+export interface TextOpts {
+  stroke?: boolean;
+  font?: string;
+}
+
+/**
+ * UI text, rasterised at the device resolution (crisp, never upscaled), in
+ * Pixelify Sans, at least 16 CSS px. A 1-unit deepest-dark stroke keeps it
+ * readable over the world.
+ */
 export function text(
   scene: Phaser.Scene,
   x: number,
   y: number,
   s: string,
-  size = 10,
+  size = UI_SIZE,
   color: string = C.bone,
+  opts: TextOpts = {},
 ): Phaser.GameObjects.Text {
-  return scene.add.text(x, y, s, { fontFamily: UI_FONT, fontSize: `${size}px`, color }).setResolution(1);
+  const t = scene.add.text(x, y, s, {
+    fontFamily: opts.font ?? UI_FONT,
+    fontSize: `${fontUnits(scene, size)}px`,
+    color,
+    stroke: opts.stroke ? C.deep : undefined,
+    strokeThickness: opts.stroke ? 3 : 0,
+  });
+  return t.setResolution(deviceScale(scene));
 }
 
 export interface Button {
@@ -29,9 +50,10 @@ export interface Button {
 }
 
 /**
- * Parchment/iron button with a Pixelify Sans label. The tap area is padded
- * so it is at least 44 CSS px tall/wide at the current scale. Fires on
- * release inside the button (so a drag/swipe that starts on it is ignored).
+ * Dark-iron button: slate fill, light-stone bevel top-left, deepest-dark
+ * bevel bottom-right, bright-bone label; soul-green border while pressed.
+ * Disabled: dimmed with a small "soon" tag. The tap area is padded to at
+ * least 44 CSS px. Fires on release inside the button.
  */
 export function makeButton(
   scene: Phaser.Scene,
@@ -41,48 +63,56 @@ export function makeButton(
   h: number,
   label: string,
   onTap: () => void,
-  opts: { iron?: boolean; size?: number; depth?: number } = {},
+  opts: { size?: number; depth?: number; disabled?: string } = {},
 ): Button {
-  let iron = opts.iron ?? false;
-  const keys = () => ({
-    up: ensurePanel(scene, w, h, iron ? 'iron' : 'parchment'),
-    down: ensurePanel(scene, w, h, iron ? 'ironDown' : 'parchmentDown'),
-  });
-  const bg = scene.add.image(x, y, keys().up).setOrigin(0);
-  const color = () => (iron ? C.bone : PALETTE.b);
-  const txt = scene.add
-    .text(x + w / 2, y + h / 2, label, { fontFamily: UI_FONT, fontSize: `${opts.size ?? 12}px`, color: color() })
-    .setOrigin(0.5)
-    .setResolution(1);
+  let selected = false;
+  const disabled = opts.disabled !== undefined;
+  const upKey = () => ensurePanel(scene, w, h, disabled ? 'ironOff' : selected ? 'ironSel' : 'iron');
+  const downKey = () => ensurePanel(scene, w, h, 'ironDown');
+  const bg = scene.add.image(x, y, upKey()).setOrigin(0);
+  const color = () => (disabled ? PALETTE.e : selected ? C.soul : C.boneBright);
+  const txt = text(scene, x + w / 2, y + h / 2, label, opts.size ?? UI_SIZE, color()).setOrigin(0.5);
+  const extra: Phaser.GameObjects.GameObject[] = [];
+  if (disabled) {
+    bg.setAlpha(0.7);
+    const tag = text(scene, x + w - 3, y + 1, opts.disabled!, 9, PALETTE.f).setOrigin(1, 0);
+    // "soon" sits on a small dark plate so it reads as a label, not a fault
+    const plate = scene.add.rectangle(tag.x + 1, tag.y, tag.displayWidth + 4, tag.displayHeight, 0x0a080b, 0.85).setOrigin(1, 0);
+    plate.setDepth((opts.depth ?? 0) + 0.05);
+    tag.setDepth((opts.depth ?? 0) + 0.2);
+    txt.setY(y + h / 2 + 3);
+    extra.push(plate, tag);
+  }
   if (opts.depth !== undefined) {
     bg.setDepth(opts.depth);
     txt.setDepth(opts.depth + 0.1);
   }
-  const css = (scene.registry.get('cssScale') as number | undefined) ?? 1;
-  const minGame = Math.ceil(MIN_TOUCH_CSS / css);
+  const minGame = Math.ceil(MIN_TOUCH_CSS / cssScale(scene));
   const padX = Math.max(0, Math.ceil((minGame - w) / 2));
   const padY = Math.max(0, Math.ceil((minGame - h) / 2));
   bg.setInteractive({
     hitArea: new Phaser.Geom.Rectangle(-padX, -padY, w + padX * 2, h + padY * 2),
     hitAreaCallback: Phaser.Geom.Rectangle.Contains,
-    useHandCursor: true,
+    useHandCursor: !disabled,
   });
   let pressed = false;
+  const baseY = txt.y;
   const release = () => {
     pressed = false;
-    bg.setTexture(keys().up);
-    txt.setY(y + h / 2);
+    bg.setTexture(upKey());
+    txt.setY(baseY);
   };
   bg.on('pointerdown', () => {
     pressed = true;
-    bg.setTexture(keys().down);
-    txt.setY(y + h / 2 + 1);
+    if (disabled) return;
+    bg.setTexture(downKey());
+    txt.setY(baseY + 1);
   });
   bg.on('pointerout', release);
   bg.on('pointerup', () => {
     if (!pressed) return;
     release();
-    play('click');
+    play(disabled ? 'bump' : 'click');
     onTap();
   });
   return {
@@ -90,8 +120,8 @@ export function makeButton(
     label: txt,
     setLabel: (s) => txt.setText(s),
     setSelected: (on) => {
-      iron = !on;
-      bg.setTexture(keys().up);
+      selected = on;
+      bg.setTexture(upKey());
       txt.setColor(color());
     },
     setVisible: (on) => {
@@ -103,6 +133,7 @@ export function makeButton(
     destroy: () => {
       bg.destroy();
       txt.destroy();
+      extra.forEach((o) => o.destroy());
     },
   };
 }

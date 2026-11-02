@@ -1,7 +1,8 @@
 import type Phaser from 'phaser';
 import { addGridSheet, addGridTexture } from './render';
+import { edgeGrid, edgeKey, type EdgeGround } from './edges';
 import type { SpriteDef } from './spriteDef';
-import { recolorFrames } from '../logic/recolor';
+import { recolorSprite } from '../logic/recolor';
 import { panelGrid, type PanelStyle } from './ui';
 
 export const idleAnimKey = (texKey: string) => `${texKey}-idle`;
@@ -15,7 +16,7 @@ export function ensureSprite(scene: Phaser.Scene, def: SpriteDef, seed?: number)
   const recolor = seed !== undefined && def.recolor?.length;
   const key = recolor ? `${def.key}#${seed}` : def.key;
   if (!scene.textures.exists(key)) {
-    const frames = recolor ? recolorFrames(def.frames, def.recolor!, seed!) : def.frames;
+    const frames = recolor ? recolorSprite(def, seed!) : def.frames;
     addGridSheet(scene, key, frames);
   }
   const anim = idleAnimKey(key);
@@ -35,5 +36,12 @@ export function ensureSprite(scene: Phaser.Scene, def: SpriteDef, seed?: number)
 export function ensurePanel(scene: Phaser.Scene, w: number, h: number, style: PanelStyle): string {
   const key = `panel-${style}-${w}x${h}`;
   addGridTexture(scene, key, panelGrid(w, h, style));
+  return key;
+}
+
+/** Grass-edge transition tile texture, composed on demand and cached. */
+export function ensureEdge(scene: Phaser.Scene, ground: EdgeGround, bits: number, variant: 0 | 1): string {
+  const key = edgeKey(ground, bits, variant);
+  if (!scene.textures.exists(key)) addGridTexture(scene, key, edgeGrid(ground, bits, variant));
   return key;
 }

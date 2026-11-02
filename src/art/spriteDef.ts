@@ -42,6 +42,12 @@ export interface SpriteDef {
   recolor?: readonly RecolorSlot[];
   /** draw a soft shadow ellipse under it */
   shadow?: boolean;
+  /** gallery grouping inside a category (e.g. 'edge' transition tiles) */
+  group?: string;
+  /** frames before the selective-outline pass (recolour uses these, then re-outlines) */
+  rawFrames?: readonly Grid[];
+  /** short gallery label (defaults to name) */
+  label?: string;
 }
 
 export const CHARACTER_ANCHOR = { x: 0.5, y: 1 } as const;

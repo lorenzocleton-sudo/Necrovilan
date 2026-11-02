@@ -17,7 +17,7 @@ const spec = {
 };
 
 describe('test patch', () => {
-  it('is 10x6 with known ground letters and registered sprites', () => {
+  it('is 20x11 (480x264 px) with known ground letters and registered sprites', () => {
     expect(PATCH_GROUND).toHaveLength(PATCH_H);
     PATCH_GROUND.forEach((r) => {
       expect(r).toHaveLength(PATCH_W);
@@ -28,13 +28,15 @@ describe('test patch', () => {
 
   it('walls, roof, props and actors block; the player start is free', () => {
     const b = buildBlocked(spec);
-    expect(b[0][1]).toBe(true); // roof
-    expect(b[1][2]).toBe(true); // door
-    expect(b[1][5] && b[1][6]).toBe(true); // stall footprint 2x1
-    expect(b[0][5]).toBe(false); // under the awning overhang
-    expect(b[4][7] && b[4][8]).toBe(true); // cart
-    expect(b[4][0]).toBe(true); // grave
-    expect(b[4][1]).toBe(true); // skeleton
+    expect(PATCH_W * 24).toBe(480);
+    expect(b[0][1] && b[1][2] && b[2][3]).toBe(true); // house 1 (3x3)
+    expect(b[2][16]).toBe(true); // house 2 door
+    expect(b[3][6] && b[3][7]).toBe(true); // stall footprint 2x1
+    expect(b[2][6]).toBe(false); // under the awning overhang
+    expect(b[5][14] && b[5][15]).toBe(true); // cart
+    expect(b[3][11]).toBe(true); // well
+    expect(b[8][2] && b[8][4] && b[10][3]).toBe(true); // graves
+    expect(b[9][5]).toBe(true); // skeleton
     expect(b[PATCH_PLAYER_START.y][PATCH_PLAYER_START.x]).toBe(false);
   });
 

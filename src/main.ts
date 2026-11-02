@@ -18,7 +18,7 @@ const game = new Phaser.Game({
   parent: 'game',
   width: GAME_W,
   height: GAME_H,
-  backgroundColor: PALETTE.a,
+  backgroundColor: PALETTE.A,
   pixelArt: true,
   roundPixels: true,
   antialias: false,
@@ -28,20 +28,41 @@ const game = new Phaser.Game({
   scene: [BootScene, TitleScene, GalleryScene, VillageScene],
 });
 
-/** Largest whole-number scale (in device pixels), letterboxed in #120e12. */
+let lastDevice = 0;
+/**
+ * Largest whole-number scale (in device pixels), letterboxed in #0a080b.
+ * The canvas gets the real device-pixel size (480*D x 270*D); cameras zoom by
+ * D (src/scenes/view.ts). Text and lights are drawn at that full resolution.
+ */
 function fit(): void {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const portrait = isPortrait(vw, vh);
   document.body.classList.toggle('portrait', portrait);
-  const s = computeScale(vw, vh, window.devicePixelRatio || 1, GAME_W, GAME_H);
+  if (portrait && lastDevice) return; // keep the landscape layout while hidden
+  const dpr = window.devicePixelRatio || 1;
+  const s = computeScale(vw, vh, dpr, GAME_W, GAME_H);
+  const w = Math.max(1, Math.round(GAME_W * s.deviceScale));
+  const h = Math.max(1, Math.round(GAME_H * s.deviceScale));
+  game.registry.set('cssScale', s.cssScale); // buttons size their touch area from this
+  game.registry.set('deviceScale', s.deviceScale);
+  if (game.scale.width !== w || game.scale.height !== h) {
+    game.scale.setZoom(s.cssScale / s.deviceScale);
+    game.scale.resize(w, h);
+  }
   const canvas = game.canvas;
   if (canvas) {
+    // Phaser skips the CSS size when it equals the backing size (dpr 1), so set it here
+    canvas.style.width = `${(w * s.cssScale) / s.deviceScale}px`;
+    canvas.style.height = `${(h * s.cssScale) / s.deviceScale}px`;
     canvas.style.left = `${s.left}px`;
     canvas.style.top = `${s.top}px`;
   }
-  game.scale.setZoom(s.cssScale);
-  game.registry.set('cssScale', s.cssScale); // buttons size their touch area from this
+  if (lastDevice && lastDevice !== s.deviceScale) {
+    // text resolution and camera zoom depend on D: rebuild the running scenes
+    for (const sc of game.scene.getScenes(true)) if (sc.scene.key !== 'Boot') sc.scene.restart();
+  }
+  lastDevice = s.deviceScale;
 }
 
 function drawRotateIcon(): void {
@@ -59,7 +80,6 @@ window.addEventListener('pointerdown', () => void unlockAudio(), { once: true, c
 window.addEventListener('keydown', () => void unlockAudio(), { once: true, capture: true });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 drawRotateIcon();
-fit();
 
 // Read-only handle for the headless smoke test (tools/smoke.mjs).
 (window as unknown as { __PHASER_GAME__: Phaser.Game }).__PHASER_GAME__ = game;

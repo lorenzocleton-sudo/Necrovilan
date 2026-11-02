@@ -22,6 +22,23 @@ describe('computeScale', () => {
     expect(s.top).toBe(30);
   });
 
+  it('tablet 1920x1200 device px -> 4x (1920x1080), letterboxed top/bottom', () => {
+    const s = computeScale(1280, 800, 1.5, 480, 270);
+    expect(s.deviceScale).toBe(4);
+    expect(s.top).toBeCloseTo(60 / 1.5);
+    expect(s.left).toBe(0);
+  });
+
+  it('phone 2400x1080 device px -> 4x, letterboxed left/right', () => {
+    const s = computeScale(2400 / 2.625, 1080 / 2.625, 2.625, 480, 270);
+    expect(s.deviceScale).toBe(4);
+    expect(s.left * 2.625).toBeCloseTo(240, 0);
+  });
+
+  it('phone 844x390 CSS at dpr 1 -> 1x (CSS rule would also be 1x)', () => {
+    expect(computeScale(844, 390, 1, 480, 270).deviceScale).toBe(1);
+  });
+
   it('never returns zero for tiny viewports', () => {
     const s = computeScale(200, 100, 1, 480, 270);
     expect(s.deviceScale).toBeGreaterThan(0);

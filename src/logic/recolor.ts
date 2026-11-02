@@ -1,6 +1,7 @@
 import { PALETTE } from '../art/palette';
 import type { Grid } from '../art/grid';
-import type { RecolorSlot } from '../art/spriteDef';
+import type { RecolorSlot, SpriteDef } from '../art/spriteDef';
+import { litOutline } from '../art/outline';
 import { makeRng } from './rng';
 
 export type LetterMap = Readonly<Record<string, string>>;
@@ -29,4 +30,10 @@ export function rollRecolor(slots: readonly RecolorSlot[], seed: number): Record
 export function recolorFrames(frames: readonly Grid[], slots: readonly RecolorSlot[], seed: number): string[][] {
   const map = rollRecolor(slots, seed);
   return frames.map((f) => recolorGrid(f, map));
+}
+
+/** Recoloured frames of a sprite: swaps run on the raw grid, then the lit outline is re-applied. */
+export function recolorSprite(def: SpriteDef, seed: number): string[][] {
+  const raw = recolorFrames(def.rawFrames ?? def.frames, def.recolor ?? [], seed);
+  return def.rawFrames ? raw.map(litOutline) : raw;
 }
